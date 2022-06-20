@@ -8,7 +8,6 @@ import twitterLogo from './assets/twitter-logo.svg';
 const TWITTER_HANDLE = 'gsrb_';
 const TWITTER_LINK = `https://twitter.com/${TWITTER_HANDLE}`;
 const OPENSEA_LINK = 'https://testnets.opensea.io/collection/bigdawgselects';
-const TOTAL_MINT_COUNT = 50;
 
 const CONTRACT_ADDRESS = "0x08C7898601E4FCd11b2D6310861e17240fad5Dd0";
 
@@ -57,12 +56,12 @@ const App = () => {
     }
   }
 
+  // listens to emitted NewNFTMinted event from contract
   const setupEventListener = async () => {
     try {
       const { ethereum } = window;
 
       if (ethereum) {
-        // Identical to askContractToMintNFT below
         const provider = new ethers.providers.Web3Provider(ethereum);
         const signer = provider.getSigner();
         const connectedContract = new ethers.Contract(CONTRACT_ADDRESS, myNFTCollection.abi, signer);
@@ -82,6 +81,7 @@ const App = () => {
     }
   }
 
+  // calls makeAnNFT function from contract
   const askContractToMintNFT = async () => { 
     try {
       const { ethereum } = window;
@@ -90,15 +90,6 @@ const App = () => {
         const provider = new ethers.providers.Web3Provider(ethereum);
         const signer = provider.getSigner();
         const connectedContract = new ethers.Contract(CONTRACT_ADDRESS, myNFTCollection.abi, signer);
-
-        // Confirms that user is on Rinkeby Testnet
-        let chainId = await ethereum.request({ method: 'eth_chainId' });
-        console.log("Connected to chain " + chainId);
-
-        const rinkebyChainId = "0x4"; 
-        if (chainId !== rinkebyChainId) {
-          alert("You are not connected to the Rinkeby Test Network. Be sure to not pay mainnet gas fees!");
-        }
 
         
         console.log("Going to pop wallet now to pay gas...")
@@ -115,12 +106,58 @@ const App = () => {
       }
     } catch (error) {
       console.log(error)
+      alert("Transaction was reverted.")
     }
   }
 
+  // switches to Rinkeby network if user is not already connected
+  const switchToRinkeby = async () => {
+    let chainId = await ethereum.request({ method: 'eth_chainId' });
+    console.log("Connected to chain " + chainId);
+
+    const rinkebyChainId = "0x4"; 
+    if (chainId !== rinkebyChainId) {
+        try {  
+          await ethereum.request({
+              method: "wallet_switchEthereumChain",
+              params: [{ chainId: rinkebyChainId, }]
+          })
+      } catch (switchError) {
+        if (switchError.code === 4902 || switchError?.data?.orginalError?.code === 4902) {
+          try {
+            await ethereum.request({
+              method: 'wallet_addEthereumChain',
+              params: [
+                {
+                  chainId: '0x4',
+                  blockExplorerUrls: ['https://rinkeby.etherscan.io'],
+                  chainName: 'Rinkeby Test Network',
+                  nativeCurrency: {
+                    decimals: 18,
+                    name: 'Ether',
+                    symbol: 'ETH'
+                  },
+                  rpcUrls: ['https://rinkeby.infura.io/v3/0d73cc5bbe184146957a9d00764db99f']
+                },
+              ],
+            })
+          } catch (error) {
+            console.log(`wallet_addEthereumChain Error: ${error.message}`)
+          }
+        }
+      }
+    }
+  }
+
+  // useEffects
+  useEffect(() => {
+    switchToRinkeby();
+  }, [])
+  
   useEffect(() => {
     checkIfWalletIsConnected();
   }, [])
+  
 
   // Render Methods
   const renderNotConnectedContainer = () => (
